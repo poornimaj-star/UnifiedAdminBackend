@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const { chatbotPool, scribePool } = require('../db.js');
+const { chatbotPool, scribePool } = require('./db.js');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
