@@ -23,7 +23,19 @@ const scribePool = mysql.createPool({
   }
 });
 
+const evaaConfigPool = mysql.createPool({
+  host: 'qamysqlserver.mysql.database.azure.com',
+  user: 'mysql_admin',
+  password: 'm@xSqL34',
+  database: 'evaa_config',
+  port: 3306,
+  ssl: {
+    rejectUnauthorized: false  // For testing only
+  }
+});
+
 module.exports = {
   chatbotPool,
-  scribePool
+  scribePool,
+  evaaConfigPool
 };
