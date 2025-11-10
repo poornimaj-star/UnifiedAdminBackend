@@ -22,45 +22,51 @@ app.use((req, res, next) => {
 app.put('/api/users/:id', async (req, res) => {
   const { id } = req.params;
   const {
-    fullName,
-    role,
-    email,
-    phone,
-    status,
-    locations,
-    defaultBusiness,
-    defaultProduct,
-    productAccess,
-    permissions
+    FIRST_NAME,
+    LAST_NAME,
+    EMAIL,
+    IS_ACTIVE,
+    IS_BLOCKED,
+    IS_PROVIDER,
+    IS_TECHNICIAN,
+    IS_REFERRING_PHYSICIAN,
+    USER_INITITALS
   } = req.body;
+  
+  console.log('🔄 Updating user:', id);
+  console.log('📝 Update data:', req.body);
+  
   try {
     const [result] = await evaaConfigPool.query(
       `UPDATE users SET
-        FULL_NAME = ?,
-        ROLE = ?,
+        FIRST_NAME = ?,
+        LAST_NAME = ?,
         EMAIL = ?,
-        PHONE = ?,
-        STATUS = ?,
-        LOCATIONS = ?,
-        DEFAULT_BUSINESS = ?,
-        DEFAULT_PRODUCT = ?,
-        PRODUCT_ACCESS = ?,
-        PERMISSIONS = ?
-      WHERE ID = ?`,
+        IS_ACTIVE = ?,
+        IS_BLOCKED = ?,
+        IS_PROVIDER = ?,
+        IS_TECHNICIAN = ?,
+        IS_REFERRING_PHYSICIAN = ?,
+        USER_INITITALS = ?,
+        UPDATE_DATE = NOW(),
+        UPDATE_BY = ?
+      WHERE USER_ID = ?`,
       [
-        fullName,
-        role,
-        email,
-        phone,
-        status,
-        Array.isArray(locations) ? locations.join(',') : '',
-        defaultBusiness,
-        defaultProduct,
-        productAccess ? JSON.stringify(productAccess) : '{}',
-        permissions ? JSON.stringify(permissions) : '{}',
+        FIRST_NAME,
+        LAST_NAME,
+        EMAIL,
+        IS_ACTIVE,
+        IS_BLOCKED,
+        IS_PROVIDER,
+        IS_TECHNICIAN,
+        IS_REFERRING_PHYSICIAN,
+        USER_INITITALS,
+        1, // UPDATE_BY
         id
       ]
     );
+    
+    console.log('✅ User updated successfully:', { id, affectedRows: result.affectedRows });
     res.json({ success: true });
   } catch (error) {
     console.error('Error updating user:', error);
@@ -68,11 +74,7 @@ app.put('/api/users/:id', async (req, res) => {
   }
 });
 // Endpoint to save organizations data according to organizations table schema
-app.post('/api/organizations', async (req, res) => {
-  console.log('🚀 POST /api/organizations endpoint hit!');
-  console.log('📝 Request headers:', req.headers);
-  console.log('📝 Request body:', req.body);
-  
+app.post('/api/organizations', async (req, res) => {  
   const {
     ORGANIZATION_NAME,
     ACCOUNT_ID,
@@ -91,14 +93,11 @@ app.post('/api/organizations', async (req, res) => {
     CREATE_DATE,
     CREATE_PROCESS
   } = req.body;
-  
-  console.log('📝 Received organizations data:', req.body);
-  
+    
   try {
     // First, let's check what columns actually exist in the organizations table
     const [columns] = await evaaConfigPool.query("SHOW COLUMNS FROM organizations");
-    const availableColumns = columns.map(col => col.Field);
-    console.log('📋 Available columns in organizations table:', availableColumns);
+    const availableColumns = columns.map(col => col.Field);   
     
     // Start with minimal data that should definitely work
     const desiredData = {
@@ -108,18 +107,14 @@ app.post('/api/organizations', async (req, res) => {
       CREATE_BY,
       CREATE_PROCESS
     };
-    
-    console.log('🔍 Desired data keys:', Object.keys(desiredData));
-    console.log('🔍 Available columns:', availableColumns);
-    
+     
     // Filter to only include columns that exist in the table
     const validColumns = [];
     const validValues = [];
     
     Object.keys(desiredData).forEach(column => {
       console.log(`🔎 Processing column: ${column}, Available: ${availableColumns.includes(column)}`);
-      if (availableColumns.includes(column) && column !== 'CREATE_DATE') {
-        console.log(`✅ Including column: ${column} with value: ${desiredData[column]}`);
+      if (availableColumns.includes(column) && column !== 'CREATE_DATE') {        
         validColumns.push(column);
         validValues.push(desiredData[column]);
       } else if (column === 'CREATE_DATE') {
@@ -138,22 +133,14 @@ app.post('/api/organizations', async (req, res) => {
     
     // Build the dynamic query with special handling for CREATE_DATE
     const placeholders = validColumns.map(col => col === 'CREATE_DATE' ? 'NOW()' : '?').join(', ');
-    const query = `INSERT INTO organizations (${validColumns.join(', ')}) VALUES (${placeholders})`;
+    const query = `INSERT INTO organizations (${validColumns.join(', ')}) VALUES (${placeholders})`;        
     
-    console.log('🔧 Dynamic query:', query);
-    console.log('📝 Values to insert:', validValues);
-    console.log('📋 Final columns:', validColumns);
-    console.log('🔢 Column count:', validColumns.length, 'Value count:', validValues.length);
-    
-    const [result] = await evaaConfigPool.query(query, validValues);
-    
-    console.log('✅ Organization saved successfully with ID:', result.insertId);
+    const [result] = await evaaConfigPool.query(query, validValues);    
     
     // Fetch and display the saved data for confirmation
     const [savedData] = await evaaConfigPool.query('SELECT * FROM organizations WHERE ORGANIZATION_ID = ?', [result.insertId]);    
     res.json({ success: true, id: result.insertId, data: savedData[0] });
   } catch (error) {
-    console.error('❌ Error saving organization:', error);
     res.status(500).json({ error: 'Failed to save organization details', details: error.message });
   }
 });
@@ -161,9 +148,7 @@ app.post('/api/organizations', async (req, res) => {
 // Endpoint to get all organizations data from organizations table
 app.get('/api/organizations', async (req, res) => {
   try {
-    const [results] = await evaaConfigPool.query('SELECT * FROM organizations ORDER BY CREATE_DATE DESC');
-    console.log('📊 Retrieved organizations:', results.length, 'records');
-    console.log('📋 Organizations Data:');
+    const [results] = await evaaConfigPool.query('SELECT * FROM organizations ORDER BY CREATE_DATE DESC'); 
     res.json(results);
   } catch (error) {
     console.error('❌ Error retrieving organizations:', error);
@@ -234,19 +219,15 @@ app.put('/api/organizations/:id', async (req, res) => {
       ]
     );
     
-    console.log('✅ Organization updated successfully');
     res.json({ success: true });
   } catch (error) {
-    console.error('❌ Error updating organization:', error);
     res.status(500).json({ error: 'Failed to update organization', details: error.message });
   }
 });
 
 // Endpoint to delete an organization by ID
 app.delete('/api/organizations/:id', async (req, res) => {
-  const { id } = req.params;
-  
-  console.log('🗑️ Deleting organization ID:', id);
+  const { id } = req.params;  
   
   try {
     // Soft delete - just mark as inactive instead of actual delete
@@ -258,12 +239,9 @@ app.delete('/api/organizations/:id', async (req, res) => {
         UPDATE_PROCESS = 3
       WHERE ORGANIZATION_ID = ?`,
       [id]
-    );
-    
-    console.log('✅ Organization marked as inactive successfully');
+    );    
     res.json({ success: true });
   } catch (error) {
-    console.error('❌ Error deleting organization:', error);
     res.status(500).json({ error: 'Failed to delete organization', details: error.message });
   }
 });
@@ -279,10 +257,8 @@ app.get('/api/organizations/:id', async (req, res) => {
       return res.status(404).json({ error: 'Organization not found' });
     }
     
-    console.log('📊 Retrieved organization ID:', id);
     res.json(results[0]);
   } catch (error) {
-    console.error('❌ Error retrieving organization:', error);
     res.status(500).json({ error: 'Failed to retrieve organization', details: error.message });
   }
 });
@@ -290,31 +266,24 @@ app.get('/api/organizations/:id', async (req, res) => {
 // Endpoint to get all providers/vendors from live database
 app.get('/api/providers', async (req, res) => {
   try {
-    console.log('🔍 Fetching all providers...');
     
     const [results] = await evaaConfigPool.query('SELECT * FROM providers');
-    console.log('� Found', results.length, 'providers');
     
     // Convert Buffer fields to proper numbers
     const processedResults = results.map(provider => ({
       ...provider,
       is_active: provider.is_active ? (Buffer.isBuffer(provider.is_active) ? provider.is_active[0] : provider.is_active) : 0,
       is_enabled: provider.is_enabled ? (Buffer.isBuffer(provider.is_enabled) ? provider.is_enabled[0] : provider.is_enabled) : 0
-    }));
-    
-    console.log('📋 Processed first provider:', processedResults[0]);
+    }));    
     
     res.json(processedResults);
   } catch (error) {
-    console.error('❌ Error fetching providers:', error);
     res.status(500).json({ error: 'Failed to fetch providers', details: error.message });
   }
 });
 
 // Endpoint to save provider data according to providers table schema
 app.post('/api/providers', async (req, res) => {
-  console.log('🚀 POST /api/providers endpoint hit!');
-  console.log('📝 Request body:', req.body);
   
   const {
     first_name,
@@ -328,13 +297,10 @@ app.post('/api/providers', async (req, res) => {
     create_process
   } = req.body;
   
-  console.log('📝 Received provider data:', req.body);
-  
   try {
     // Check what columns actually exist in the providers table
     const [columns] = await evaaConfigPool.query("SHOW COLUMNS FROM providers");
     const availableColumns = columns.map(col => col.Field);
-    console.log('📋 Available columns in providers table:', availableColumns);
     
     // Prepare the data for insertion
     const desiredData = {
@@ -349,23 +315,16 @@ app.post('/api/providers', async (req, res) => {
       create_process: create_process || 1
     };
     
-    console.log('🔍 Desired data keys:', Object.keys(desiredData));
-    console.log('🔍 Available columns:', availableColumns);
-    
     // Filter to only include columns that exist in the table
     const validColumns = [];
     const validValues = [];
     
     Object.keys(desiredData).forEach(column => {
-      console.log(`🔎 Processing column: ${column}, Available: ${availableColumns.includes(column)}`);
       if (availableColumns.includes(column) && column !== 'create_date') {
-        console.log(`✅ Including column: ${column} with value: ${desiredData[column]}`);
         validColumns.push(column);
         validValues.push(desiredData[column]);
       } else if (column === 'create_date') {
-        console.log(`📅 Using NOW() for create_date column`);
       } else {
-        console.log(`⚠️ Skipping column '${column}' - not found in table schema`);
       }
     });
     
@@ -376,34 +335,21 @@ app.post('/api/providers', async (req, res) => {
     
     // Build the dynamic query with special handling for create_date
     const placeholders = validColumns.map(col => col === 'create_date' ? 'NOW()' : '?').join(', ');
-    const query = `INSERT INTO providers (${validColumns.join(', ')}) VALUES (${placeholders})`;
-    
-    console.log('🔧 Dynamic query:', query);
-    console.log('📝 Values to insert:', validValues);
-    console.log('📋 Final columns:', validColumns);
-    console.log('🔢 Column count:', validColumns.length, 'Value count:', validValues.length);
+    const query = `INSERT INTO providers (${validColumns.join(', ')}) VALUES (${placeholders})`;      
     
     const [result] = await evaaConfigPool.query(query, validValues);
-    
-    console.log('✅ Provider saved successfully with ID:', result.insertId);
     
     // Fetch and display the saved data for confirmation
     const [savedData] = await evaaConfigPool.query('SELECT * FROM providers WHERE provider_id = ?', [result.insertId]);    
     res.json({ success: true, id: result.insertId, data: savedData[0] });
   } catch (error) {
-    console.error('❌ Error saving provider:', error);
     res.status(500).json({ error: 'Failed to save provider details', details: error.message });
   }
 });
 
 // Endpoint to update provider data according to providers table schema
 app.put('/api/providers/:id', async (req, res) => {
-  console.log('🚀 PUT /api/providers/:id endpoint hit!');
-  const { id } = req.params;
-  console.log('📝 Updating provider ID:', id);
-  console.log('📝 Request body:', req.body);
-  
-
+  const { id } = req.params;  
   
   const {
     first_name,
@@ -418,12 +364,10 @@ app.put('/api/providers/:id', async (req, res) => {
   } = req.body;
   
   try {
-    console.log('🔍 Starting provider update...');
     
     // First check what columns actually exist
     const [columns] = await evaaConfigPool.query('SHOW COLUMNS FROM providers');
     const columnNames = columns.map(col => col.Field);
-    console.log('📋 Available columns:', columnNames);
     
     // Build update query with all the fields we want to update
     let updateFields = [];
@@ -463,14 +407,9 @@ app.put('/api/providers/:id', async (req, res) => {
     }
     
     const updateQuery = `UPDATE providers SET ${updateFields.join(', ')} WHERE provider_id = ?`;
-    updateValues.push(id);
-    
-    console.log('� Update query:', updateQuery);
-    console.log('� Update values:', updateValues);
+    updateValues.push(id);    
     
     const [result] = await evaaConfigPool.query(updateQuery, updateValues);
-    
-    console.log('✅ Provider updated successfully, affected rows:', result.affectedRows);
     
     if (result.affectedRows === 0) {
       console.log('⚠️ No rows were affected - provider might not exist');
@@ -481,7 +420,6 @@ app.put('/api/providers/:id', async (req, res) => {
     const [updatedData] = await evaaConfigPool.query('SELECT * FROM providers WHERE provider_id = ?', [id]);
     
     if (updatedData.length === 0) {
-      console.log('⚠️ Provider not found after update');
       return res.status(404).json({ error: 'Provider not found after update' });
     }
     
@@ -490,9 +428,7 @@ app.put('/api/providers/:id', async (req, res) => {
       ...updatedData[0],
       is_active: updatedData[0].is_active ? (Buffer.isBuffer(updatedData[0].is_active) ? updatedData[0].is_active[0] : updatedData[0].is_active) : 0,
       is_enabled: updatedData[0].is_enabled ? (Buffer.isBuffer(updatedData[0].is_enabled) ? updatedData[0].is_enabled[0] : updatedData[0].is_enabled) : 0
-    };
-    
-    console.log('📊 Processed updated provider data:', processedData);
+    };    
     res.json({ 
       success: true, 
       id: parseInt(id), 
@@ -500,7 +436,6 @@ app.put('/api/providers/:id', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Error updating provider:', error);
     res.status(500).json({ error: 'Failed to update provider details', details: error.message });
   }
 });
@@ -511,22 +446,14 @@ app.put('/api/providers/:id/test', async (req, res) => {
   const { first_name, last_name } = req.body;
   
   try {
-    console.log('🧪 Test update for provider ID:', id);
-    console.log('🧪 Test update data:', { first_name, last_name });
     
     const query = 'UPDATE providers SET first_name = ?, last_name = ? WHERE provider_id = ?';
     const values = [first_name, last_name, id];
     
-    console.log('🧪 Test query:', query);
-    console.log('🧪 Test values:', values);
-    
     const [result] = await evaaConfigPool.query(query, values);
-    
-    console.log('🧪 Test result:', result);
     
     res.json({ success: true, message: 'Test update successful', affectedRows: result.affectedRows });
   } catch (error) {
-    console.error('🧪 Test update error:', error);
     res.status(500).json({ error: 'Test update failed', details: error.message });
   }
 });
@@ -534,29 +461,203 @@ app.put('/api/providers/:id/test', async (req, res) => {
 // Endpoint to delete a user by ID
 app.delete('/api/users/:id', async (req, res) => {
   const { id } = req.params;
+  
+  console.log('🗑️ Deleting user with ID:', id);
+  
   try {
-    const [result] = await chatbotPool.query('DELETE FROM users WHERE ID = ?', [id]);
-    res.json({ success: true });
+    // First check if user exists
+    const [existingUser] = await evaaConfigPool.query(
+      'SELECT USER_ID, FIRST_NAME, LAST_NAME, EMAIL FROM users WHERE USER_ID = ?',
+      [id]
+    );
+    
+    if (existingUser.length === 0) {
+      console.log('❌ User not found:', id);
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    console.log('👤 Found user to delete:', existingUser[0]);
+    
+    // Delete the user
+    const [result] = await evaaConfigPool.query('DELETE FROM users WHERE USER_ID = ?', [id]);
+    
+    console.log('✅ User deleted successfully:', { id, affectedRows: result.affectedRows });
+    res.json({ success: true, message: 'User deleted successfully' });
   } catch (error) {
-    console.error('Error deleting user:', error);
-    res.status(500).json({ error: 'Failed to delete user' });
+    console.error('❌ Error deleting user:', error);
+    console.error('SQL Error details:', {
+      code: error.code,
+      errno: error.errno,
+      sqlMessage: error.sqlMessage,
+      sqlState: error.sqlState
+    });
+    res.status(500).json({ error: 'Failed to delete user', details: error.message });
   }
 });
 // Endpoint to get all users from live database
 app.get('/api/users', async (req, res) => {
   try {
-    const [results] = await chatbotPool.query('SELECT * FROM users');
-    res.json(results);
+    const [results] = await evaaConfigPool.query('SELECT * FROM users');
+    
+    console.log(`👥 Fetched ${results.length} users from database`);
+    
+    // Convert Buffer fields to proper numbers for JSON response
+    const processedResults = results.map(user => ({
+      ...user,
+      IS_ACTIVE: Buffer.isBuffer(user.IS_ACTIVE) ? user.IS_ACTIVE[0] : Number(user.IS_ACTIVE || 0),
+      IS_BLOCKED: Buffer.isBuffer(user.IS_BLOCKED) ? user.IS_BLOCKED[0] : Number(user.IS_BLOCKED || 0),
+      IS_PROVIDER: Buffer.isBuffer(user.IS_PROVIDER) ? user.IS_PROVIDER[0] : Number(user.IS_PROVIDER || 0),
+      IS_TECHNICIAN: Buffer.isBuffer(user.IS_TECHNICIAN) ? user.IS_TECHNICIAN[0] : Number(user.IS_TECHNICIAN || 0),
+      IS_REFERRING_PHYSICIAN: Buffer.isBuffer(user.IS_REFERRING_PHYSICIAN) ? user.IS_REFERRING_PHYSICIAN[0] : Number(user.IS_REFERRING_PHYSICIAN || 0)
+    }));
+    
+    processedResults.forEach(user => {
+      console.log(`   - ${user.FIRST_NAME} ${user.LAST_NAME}: IS_ACTIVE=${user.IS_ACTIVE}, IS_BLOCKED=${user.IS_BLOCKED}`);
+    });
+    
+    res.json(processedResults);
   } catch (error) {
-    console.error('Error fetching users:', error);
-    res.status(500).json({ error: 'Failed to fetch users' });
+    console.error('❌ Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users', details: error.message });
   }
 });
+
+// Endpoint to create a new user in the database
+app.post('/api/users', async (req, res) => {
+  console.log('📝 Creating new user');
+  console.log('📝 Received user data:', req.body);
+  
+  const {
+    fullName,
+    role,
+    email,
+    phone,
+    status,
+    locations,
+    defaultBusiness,
+    defaultProduct,
+    productAccess,
+    permissions
+  } = req.body;
+
+  // Split fullName into first and last name for database columns
+  const nameParts = (fullName || '').split(' ');
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '';
+
+  // Convert status to boolean fields
+  const isActive = status === 'Active' ? 1 : 0;
+  const isBlocked = status === 'Inactive' ? 1 : 0;
+
+  // Convert role to boolean fields
+  const isProvider = role === 'Provider' ? 1 : 0;
+  const isTechnician = role === 'Technician' ? 1 : 0;
+  const isReferringPhysician = role === 'Referring Physician' ? 1 : 0;
+
+  try {
+    // Check if email already exists
+    console.log('🔍 Checking if email already exists:', email);
+    const [existingUsers] = await evaaConfigPool.query(
+      'SELECT USER_ID, EMAIL FROM users WHERE EMAIL = ?',
+      [email]
+    );
+    
+    if (existingUsers.length > 0) {
+      console.log('❌ Email already exists in database:', email);
+      return res.status(400).json({ 
+        error: 'Email already exists', 
+        message: `A user with email "${email}" already exists. Please use a different email address.` 
+      });
+    }
+
+    // Generate a temporary password and user initials
+    const tempPassword = 'TempPass123!'; // Default temporary password
+    const userInitials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+
+    console.log('🗄️ Mapped database fields for new user:', {
+      EMAIL: email,
+      LOGIN_PASSWORD: '[TEMP PASSWORD]',
+      FIRST_NAME: firstName,
+      LAST_NAME: lastName,
+      USER_INITITALS: userInitials,
+      IS_PROVIDER: isProvider,
+      IS_TECHNICIAN: isTechnician,
+      IS_REFERRING_PHYSICIAN: isReferringPhysician,
+      IS_BLOCKED: isBlocked,
+      IS_ACTIVE: isActive,
+      CREATE_BY: 1,
+      IS_ENABLED: 1,
+      IS_PASSWORD_SET: 0
+    });
+
+    const [result] = await evaaConfigPool.query(
+      `INSERT INTO users (
+        EMAIL,
+        LOGIN_PASSWORD,
+        FIRST_NAME,
+        LAST_NAME,
+        USER_INITITALS,
+        IS_PROVIDER,
+        IS_TECHNICIAN,
+        IS_REFERRING_PHYSICIAN,
+        IS_BLOCKED,
+        IS_ACTIVE,
+        CREATE_BY,
+        CREATE_DATE,
+        IS_ENABLED,
+        IS_PASSWORD_SET
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)`,
+      [
+        email,
+        tempPassword,
+        firstName,
+        lastName,
+        userInitials,
+        isProvider,
+        isTechnician,
+        isReferringPhysician,
+        isBlocked,
+        isActive,
+        1, // CREATE_BY - default user ID
+        1, // IS_ENABLED - default to enabled
+        0  // IS_PASSWORD_SET - false since it's a temp password
+      ]
+    );
+    
+    console.log('✅ User created successfully:', { id: result.insertId, affectedRows: result.affectedRows });
+    
+    // Verify the created user
+    const [verification] = await evaaConfigPool.query(
+      'SELECT USER_ID, FIRST_NAME, LAST_NAME, EMAIL, USER_INITITALS, IS_ACTIVE, IS_BLOCKED, IS_PROVIDER FROM users WHERE USER_ID = ?',
+      [result.insertId]
+    );
+    console.log('🔍 Verification after creation:', verification[0]);
+    
+    res.json({ success: true, id: result.insertId, user: verification[0] });
+  } catch (error) {
+    console.error('❌ Error creating user:', error);
+    console.error('SQL Error details:', {
+      code: error.code,
+      errno: error.errno,
+      sqlMessage: error.sqlMessage,
+      sqlState: error.sqlState
+    });
+    
+    // Handle specific error cases
+    if (error.code === 'ER_DUP_ENTRY' && error.sqlMessage.includes('EMAIL_UNIQUE')) {
+      return res.status(400).json({ 
+        error: 'Email already exists', 
+        message: `A user with this email address already exists. Please use a different email.` 
+      });
+    }
+    
+    res.status(500).json({ error: 'Failed to create user', details: error.message });
+  }
+});
+
 // Endpoint to update an existing location
 app.put('/api/locations/:id', async (req, res) => {
   const { id } = req.params;
-  console.log('📝 Updating location ID:', id);
-  console.log('📝 Received update data:', req.body);
   
   // Handle both field mapping formats
   const locationData = req.body;
@@ -595,18 +696,16 @@ app.put('/api/locations/:id', async (req, res) => {
         UPDATE_PROCESS,
         id
       ]
+    );    
+    
+    // Verify the update by checking the current state
+    const [verification] = await evaaConfigPool.query(
+      'SELECT LOCATION_ID, LOCATION_NAME, IS_ACTIVE, IS_ENABLED FROM locations WHERE LOCATION_ID = ?',
+      [id]
     );
     
-    console.log('✅ Location updated successfully:', { affectedRows: result.affectedRows });
     res.json({ success: true, affectedRows: result.affectedRows });
   } catch (error) {
-    console.error('❌ Error updating location:', error);
-    console.error('SQL Error details:', {
-      code: error.code,
-      errno: error.errno,
-      sqlMessage: error.sqlMessage,
-      sqlState: error.sqlState
-    });
     res.status(500).json({ 
       error: 'Failed to update location',
       details: error.sqlMessage || error.message
@@ -617,17 +716,13 @@ app.put('/api/locations/:id', async (req, res) => {
 // Endpoint to delete a location
 app.delete('/api/locations/:id', async (req, res) => {
   const { id } = req.params;
-  console.log('🗑️ Deleting location ID:', id, 'Type:', typeof id);
   
   try {
     // First check if location exists
-    console.log('🔍 Checking if location exists with ID:', id);
     const [existingLocation] = await evaaConfigPool.query(
       'SELECT LOCATION_ID, LOCATION_NAME, IS_ACTIVE FROM locations WHERE LOCATION_ID = ?',
       [id]
     );
-    
-    console.log('📋 Found locations:', existingLocation);
     
     if (existingLocation.length === 0) {
       return res.status(404).json({ 
@@ -635,34 +730,22 @@ app.delete('/api/locations/:id', async (req, res) => {
         error: 'Location not found' 
       });
     }
-    
-    console.log('📍 Found location to delete:', existingLocation[0].LOCATION_NAME, 'Current IS_ACTIVE:', existingLocation[0].IS_ACTIVE);
-    
+        
     // Perform soft delete by setting IS_ACTIVE = 0 instead of hard delete
-    console.log('🔄 Executing UPDATE query with ID:', id);
     const updateQuery = `UPDATE locations SET 
         IS_ACTIVE = 0,
         UPDATE_BY = 1,
         UPDATE_DATE = NOW(),
         UPDATE_PROCESS = 3
       WHERE LOCATION_ID = ?`;
-    console.log('📝 Update Query:', updateQuery);
-    console.log('📝 Update Values:', [id]);
     
-    const [result] = await evaaConfigPool.query(updateQuery, [id]);
-    
-    console.log('✅ Location soft deleted successfully:', { 
-      affectedRows: result.affectedRows,
-      changedRows: result.changedRows,
-      info: result.info 
-    });
+    const [result] = await evaaConfigPool.query(updateQuery, [id]); 
     
     // Verify the update worked
     const [verifyLocation] = await evaaConfigPool.query(
       'SELECT LOCATION_ID, LOCATION_NAME, IS_ACTIVE FROM locations WHERE LOCATION_ID = ?',
       [id]
     );
-    console.log('🔍 Verification after update:', verifyLocation);
     
     if (result.affectedRows === 0) {
       return res.status(404).json({ 
@@ -678,13 +761,6 @@ app.delete('/api/locations/:id', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Error deleting location:', error);
-    console.error('SQL Error details:', {
-      code: error.code,
-      errno: error.errno,
-      sqlMessage: error.sqlMessage,
-      sqlState: error.sqlState
-    });
     res.status(500).json({ 
       success: false,
       error: 'Failed to delete location',
@@ -695,47 +771,55 @@ app.delete('/api/locations/:id', async (req, res) => {
 
 // Endpoint to hard delete inactive locations (permanently remove from database)
 app.delete('/api/locations/cleanup', async (req, res) => {
-  console.log('🗑️ Hard deleting all inactive locations (IS_ACTIVE = 0)');
   
   try {
     // First, get list of locations that will be deleted for logging
     const [inactiveLocations] = await evaaConfigPool.query(
       'SELECT LOCATION_ID, LOCATION_NAME FROM locations WHERE IS_ACTIVE = 0'
-    );
+    );    
     
-    console.log('📋 Found inactive locations to delete:', inactiveLocations.length);
+    if (inactiveLocations.length === 0) {
+      return res.json({ 
+        success: true, 
+        message: 'No inactive locations found to delete',
+        deletedCount: 0,
+        deletedLocations: []
+      });
+    }
+    
     inactiveLocations.forEach(loc => {
-      console.log(`  - ID: ${loc.LOCATION_ID}, Name: ${loc.LOCATION_NAME}`);
     });
     
-    // Perform hard delete - permanently remove records
-    const [result] = await evaaConfigPool.query(
-      'DELETE FROM locations WHERE IS_ACTIVE = 0'
-    );
+    // Perform hard delete using primary key to avoid safe mode issues
+    // Delete each location individually using LOCATION_ID (primary key)
+    let totalDeleted = 0;
+    const deletedLocations = [];
     
-    console.log('✅ Hard delete completed:', { 
-      affectedRows: result.affectedRows,
-      deletedCount: result.affectedRows 
-    });
+    for (const location of inactiveLocations) {
+      
+      const [result] = await evaaConfigPool.query(
+        'DELETE FROM locations WHERE LOCATION_ID = ? AND IS_ACTIVE = 0',
+        [location.LOCATION_ID]
+      );
+      
+      if (result.affectedRows > 0) {
+        totalDeleted += result.affectedRows;
+        deletedLocations.push({
+          id: location.LOCATION_ID,
+          name: location.LOCATION_NAME
+        });
+      }
+    }        
     
     res.json({ 
       success: true, 
-      message: `Permanently deleted ${result.affectedRows} inactive locations`,
-      deletedCount: result.affectedRows,
-      deletedLocations: inactiveLocations.map(loc => ({
-        id: loc.LOCATION_ID,
-        name: loc.LOCATION_NAME
-      }))
+      message: `Permanently deleted ${totalDeleted} inactive locations`,
+      deletedCount: totalDeleted,
+      processedCount: inactiveLocations.length,
+      deletedLocations: deletedLocations
     });
     
-  } catch (error) {
-    console.error('❌ Error performing hard delete:', error);
-    console.error('SQL Error details:', {
-      code: error.code,
-      errno: error.errno,
-      sqlMessage: error.sqlMessage,
-      sqlState: error.sqlState
-    });
+  } catch (error) {  
     res.status(500).json({ 
       success: false,
       error: 'Failed to perform hard delete',
@@ -746,18 +830,14 @@ app.delete('/api/locations/cleanup', async (req, res) => {
 
 // Endpoint to call stored procedure for location cleanup
 app.post('/api/locations/cleanup-procedure', async (req, res) => {
-  const { locationId = null, isActive = 1, deleteType = 'hard' } = req.body;
-  
-  console.log('🗑️ Calling delete_locations stored procedure:', { locationId, isActive, deleteType });
+  const { locationId = null, isActive = 1, deleteType = 'hard' } = req.body;  
   
   try {
     // Call the stored procedure
     const [result] = await evaaConfigPool.query(
       'CALL delete_locations(?, ?, ?)',
       [locationId, isActive, deleteType]
-    );
-    
-    console.log('✅ Stored procedure completed:', result);
+    );    
     
     res.json({ 
       success: true, 
@@ -765,14 +845,7 @@ app.post('/api/locations/cleanup-procedure', async (req, res) => {
       result: result
     });
     
-  } catch (error) {
-    console.error('❌ Error calling stored procedure:', error);
-    console.error('SQL Error details:', {
-      code: error.code,
-      errno: error.errno,
-      sqlMessage: error.sqlMessage,
-      sqlState: error.sqlState
-    });
+  } catch (error) {   
     res.status(500).json({ 
       success: false,
       error: 'Failed to execute stored procedure',
@@ -822,21 +895,24 @@ app.get('/api/locations', async (req, res) => {
         UPDATE_DATE,
         UPDATE_PROCESS
       FROM locations 
-      WHERE IS_ACTIVE = 1
       ORDER BY CREATE_DATE DESC
-    `);
+    `);    
     
-    console.log(`📍 Fetched ${results.length} active locations from database`);
-    res.json(results);
+    // Convert Buffer fields to proper numbers for JSON response
+    const processedResults = results.map(location => ({
+      ...location,
+      IS_ACTIVE: Buffer.isBuffer(location.IS_ACTIVE) ? location.IS_ACTIVE[0] : Number(location.IS_ACTIVE),
+      IS_ENABLED: Buffer.isBuffer(location.IS_ENABLED) ? location.IS_ENABLED[0] : Number(location.IS_ENABLED)
+    }));    
+    
+    res.json(processedResults);
   } catch (error) {
-    console.error('❌ Error fetching locations:', error);
     res.status(500).json({ error: 'Failed to fetch locations' });
   }
 });
 
 // Endpoint to add a new location
 app.post('/api/locations', async (req, res) => {
-  console.log('📝 Received location data:', req.body);
   
   // Handle both field mapping formats
   const locationData = req.body;
@@ -869,16 +945,15 @@ app.post('/api/locations', async (req, res) => {
       ]
     );
     
-    console.log('✅ Location created successfully:', { id: result.insertId, affectedRows: result.affectedRows });
+    
+    // Verify the created location
+    const [verification] = await evaaConfigPool.query(
+      'SELECT LOCATION_ID, LOCATION_NAME, IS_ACTIVE, IS_ENABLED FROM locations WHERE LOCATION_ID = ?',
+      [result.insertId]
+    );
+    
     res.json({ success: true, id: result.insertId });
   } catch (error) {
-    console.error('❌ Error adding location:', error);
-    console.error('SQL Error details:', {
-      code: error.code,
-      errno: error.errno,
-      sqlMessage: error.sqlMessage,
-      sqlState: error.sqlState
-    });
     res.status(500).json({ 
       error: 'Failed to add location',
       details: error.sqlMessage || error.message
@@ -892,7 +967,6 @@ app.get('/api/clients', async (req, res) => {
     const [results] = await chatbotPool.query('SELECT * FROM client');
     res.json(results);
   } catch (error) {
-    console.error('Error fetching clients:', error);
     res.status(500).json({ error: 'Failed to fetch clients' });
   }
 });
@@ -915,11 +989,18 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📋 Available endpoints:`);
   console.log(`   GET  /api/health`);
-  console.log(`   GET  /api/organizations/test`);
-  console.log(`   POST /api/organizations`);
+  console.log(`   GET  /api/users`);
+  console.log(`   PUT  /api/users/:id`);
+  console.log(`   GET  /api/locations`);
+  console.log(`   POST /api/locations`);
+  console.log(`   PUT  /api/locations/:id`);
+  console.log(`   DELETE /api/locations/:id`);
   console.log(`   GET  /api/organizations`);
+  console.log(`   POST /api/organizations`);
   console.log(`   PUT  /api/organizations/:id`);
   console.log(`   DELETE /api/organizations/:id`);
-  console.log(`   GET  /api/organizations/:id`);
-  console.log(`🌍 Server accessible at: https://unifiedadminbackend-tex0.onrender.com`);
+  console.log(`   GET  /api/providers`);
+  console.log(`   POST /api/providers`);
+  console.log(`   PUT  /api/providers/:id`);
+  console.log(`🌍 Server accessible at: http://localhost:${PORT}`);
 });
