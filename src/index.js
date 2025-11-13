@@ -985,6 +985,92 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
+app.get('/api/businesses', async (req, res) => {
+  try {
+    const [results] = await evaaConfigPool.query('SELECT * FROM businesses');
+    res.json(results);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch businesses' });
+  }
+});
+// Add new business
+app.post('/api/businesses', async (req, res) => {
+  try {
+    const {
+      organization_id,
+      business_name,
+      is_enabled = 1,
+      is_active = 1,
+      create_by = null,
+      create_process = null,
+      update_by = null,
+      update_process = null
+    } = req.body;
+
+    // Insert into businesses table
+    const [result] = await evaaConfigPool.query(
+      `INSERT INTO businesses (
+        organization_id, business_name, is_enabled, is_active, create_by, create_date, create_process, update_by, update_date, update_process
+      ) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, NOW(), ?)`,
+      [
+        organization_id,
+        business_name,
+        is_enabled,
+        is_active,
+        create_by,
+        create_process,
+        update_by,
+        update_process
+      ]
+    );
+    res.status(201).json({ success: true, business_id: result.insertId });
+  } catch (error) {
+    console.error('Error inserting business:', error);
+    res.status(500).json({ error: 'Failed to add business' });
+  }
+});
+// Update business by ID
+app.put('/api/businesses/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      organization_id,
+      business_name,
+      is_enabled = 1,
+      is_active = 1,
+      update_by = null,
+      update_process = null
+    } = req.body;
+
+    const [result] = await evaaConfigPool.query(
+      `UPDATE businesses SET 
+        organization_id = ?,
+        business_name = ?,
+        is_enabled = ?,
+        is_active = ?,
+        update_by = ?,
+        update_date = NOW(),
+        update_process = ?
+      WHERE business_id = ?`,
+      [
+        organization_id,
+        business_name,
+        is_enabled,
+        is_active,
+        update_by,
+        update_process,
+        id
+      ]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Business not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating business:', error);
+    res.status(500).json({ error: 'Failed to update business' });
+  }
+});
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📋 Available endpoints:`);
