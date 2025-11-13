@@ -91,7 +91,10 @@ app.post('/api/organizations', async (req, res) => {
     IS_ACTIVE,
     CREATE_BY,
     CREATE_DATE,
-    CREATE_PROCESS
+    CREATE_PROCESS,
+    ADDRESS_LINE_ONE,
+    ADDRESS_LINE_TWO,
+    TAX_ID
   } = req.body;
     
   try {
@@ -105,7 +108,10 @@ app.post('/api/organizations', async (req, res) => {
       ACCOUNT_ID,
       IS_ACTIVE,
       CREATE_BY,
-      CREATE_PROCESS
+      CREATE_PROCESS,
+      ADDRESS_LINE_ONE,
+      ADDRESS_LINE_TWO,
+      TAX_ID
     };
      
     // Filter to only include columns that exist in the table
@@ -294,7 +300,11 @@ app.post('/api/providers', async (req, res) => {
     is_enabled,
     is_active,
     create_by,
-    create_process
+    create_process,
+    suffix,
+    credentials,
+    email,
+    phone
   } = req.body;
   
   try {
@@ -309,10 +319,14 @@ app.post('/api/providers', async (req, res) => {
       middle_name,
       specialty,
       NPI,
-      is_enabled: is_enabled !== undefined ? is_enabled : 1,
-      is_active: is_active !== undefined ? is_active : 1,
+      is_enabled: typeof is_enabled === 'string' ? (is_enabled === 'Active' ? 1 : 0) : (is_enabled !== undefined ? is_enabled : 1),
+      is_active: typeof is_active === 'string' ? (is_active === 'Active' ? 1 : 0) : (is_active !== undefined ? is_active : 1),
       create_by: create_by || 1,
-      create_process: create_process || 1
+      create_process: create_process || 1,
+      suffix,
+      credentials,
+      email,
+      phone
     };
     
     // Filter to only include columns that exist in the table
@@ -360,7 +374,11 @@ app.put('/api/providers/:id', async (req, res) => {
     is_enabled,
     is_active,
     update_by,
-    update_process
+    update_process,
+    suffix,
+    credentials,
+    email,
+    phone
   } = req.body;
   
   try {
@@ -396,11 +414,27 @@ app.put('/api/providers/:id', async (req, res) => {
     }
     if (columnNames.includes('is_enabled')) {
       updateFields.push('is_enabled = ?');
-      updateValues.push(is_enabled || 1);
+      updateValues.push(typeof is_enabled === 'string' ? (is_enabled === 'Active' ? 1 : 0) : (is_enabled !== undefined ? is_enabled : 1));
     }
     if (columnNames.includes('is_active')) {
       updateFields.push('is_active = ?');
-      updateValues.push(is_active || 1);
+      updateValues.push(typeof is_active === 'string' ? (is_active === 'Active' ? 1 : 0) : (is_active !== undefined ? is_active : 1));
+    }
+    if (columnNames.includes('suffix')) {
+      updateFields.push('suffix = ?');
+      updateValues.push(suffix || '');
+    }
+    if (columnNames.includes('credentials')) {
+      updateFields.push('credentials = ?');
+      updateValues.push(credentials || '');
+    }
+    if (columnNames.includes('email')) {
+      updateFields.push('email = ?');
+      updateValues.push(email || '');
+    }
+    if (columnNames.includes('phone')) {
+      updateFields.push('phone = ?');
+      updateValues.push(phone || '');
     }
     if (columnNames.includes('update_date')) {
       updateFields.push('update_date = NOW()');
@@ -671,6 +705,8 @@ app.put('/api/locations/:id', async (req, res) => {
   const IS_ACTIVE = locationData.IS_ACTIVE !== undefined ? locationData.IS_ACTIVE : (locationData.status === 'Active' ? 1 : 0);
   const UPDATE_BY = locationData.UPDATE_BY || locationData.updateBy || 1;
   const UPDATE_PROCESS = locationData.UPDATE_PROCESS || locationData.updateProcess || 2; // 2 for update process
+  const PHONE_NUMBER = locationData.PHONE_NUMBER || locationData.phone_number || null;
+  const ADDRESS = locationData.ADDRESS || locationData.address || null;
 
   try {
     const [result] = await evaaConfigPool.query(
@@ -683,7 +719,9 @@ app.put('/api/locations/:id', async (req, res) => {
         IS_ACTIVE = ?,
         UPDATE_BY = ?,
         UPDATE_DATE = NOW(),
-        UPDATE_PROCESS = ?
+        UPDATE_PROCESS = ?,
+        PHONE_NUMBER = ?,
+        ADDRESS = ?
       WHERE LOCATION_ID = ?`,
       [
         LOCATION_NAME,
@@ -694,9 +732,11 @@ app.put('/api/locations/:id', async (req, res) => {
         IS_ACTIVE,
         UPDATE_BY,
         UPDATE_PROCESS,
+        PHONE_NUMBER,
+        ADDRESS,
         id
       ]
-    );    
+    );
     
     // Verify the update by checking the current state
     const [verification] = await evaaConfigPool.query(
@@ -893,7 +933,9 @@ app.get('/api/locations', async (req, res) => {
         CREATE_DATE,
         UPDATE_BY,
         UPDATE_DATE,
-        UPDATE_PROCESS
+        UPDATE_PROCESS,
+        PHONE_NUMBER,
+        ADDRESS
       FROM locations 
       ORDER BY CREATE_DATE DESC
     `);    
@@ -926,13 +968,15 @@ app.post('/api/locations', async (req, res) => {
   const IS_ACTIVE = locationData.IS_ACTIVE !== undefined ? locationData.IS_ACTIVE : (locationData.status === 'Active' ? 1 : 0);
   const CREATE_BY = locationData.CREATE_BY || locationData.createBy || 1; // Default user ID
   const UPDATE_PROCESS = locationData.UPDATE_PROCESS || locationData.updateProcess || 1; // Default process ID
+  const PHONE_NUMBER = locationData.PHONE_NUMBER || locationData.phone_number || null;
+  const ADDRESS = locationData.ADDRESS || locationData.address || null;
   
   try {
     const [result] = await evaaConfigPool.query(
       `INSERT INTO locations (
         LOCATION_NAME, BUSINESS_ID, IS_DEFAULT, TIME_ZONE, IS_ENABLED, IS_ACTIVE,
-        CREATE_BY, CREATE_DATE, UPDATE_PROCESS
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+        CREATE_BY, CREATE_DATE, UPDATE_PROCESS,PHONE_NUMBER, ADDRESS
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)`,
       [
         LOCATION_NAME,
         BUSINESS_ID,
@@ -941,7 +985,9 @@ app.post('/api/locations', async (req, res) => {
         IS_ENABLED,
         IS_ACTIVE,
         CREATE_BY,
-        UPDATE_PROCESS
+        UPDATE_PROCESS,
+        PHONE_NUMBER,
+        ADDRESS
       ]
     );
     
@@ -1004,14 +1050,19 @@ app.post('/api/businesses', async (req, res) => {
       create_by = null,
       create_process = null,
       update_by = null,
-      update_process = null
+      update_process = null,
+      dba_name = null,
+      address_line_one = null,
+      address_line_two = null,
+      phone_number = null,
+      extension = null
     } = req.body;
 
     // Insert into businesses table
     const [result] = await evaaConfigPool.query(
       `INSERT INTO businesses (
-        organization_id, business_name, is_enabled, is_active, create_by, create_date, create_process, update_by, update_date, update_process
-      ) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, NOW(), ?)`,
+        organization_id, business_name, is_enabled, is_active, create_by, create_date, create_process, update_by, update_date, update_process, dba_name, address_line_one, address_line_two, phone_number, extension
+      ) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, NOW(), ?, ?, ?, ?, ?, ?)`,
       [
         organization_id,
         business_name,
@@ -1020,7 +1071,12 @@ app.post('/api/businesses', async (req, res) => {
         create_by,
         create_process,
         update_by,
-        update_process
+        update_process,
+        dba_name,
+        address_line_one,
+        address_line_two,
+        phone_number,
+        extension
       ]
     );
     res.status(201).json({ success: true, business_id: result.insertId });
@@ -1039,7 +1095,12 @@ app.put('/api/businesses/:id', async (req, res) => {
       is_enabled = 1,
       is_active = 1,
       update_by = null,
-      update_process = null
+      update_process = null,
+      dba_name = null,
+      address_line_one = null,
+      address_line_two = null,
+      phone_number = null,
+      extension = null
     } = req.body;
 
     const [result] = await evaaConfigPool.query(
@@ -1050,7 +1111,12 @@ app.put('/api/businesses/:id', async (req, res) => {
         is_active = ?,
         update_by = ?,
         update_date = NOW(),
-        update_process = ?
+        update_process = ?,
+        dba_name = ?,
+        address_line_one = ?,
+        address_line_two = ?,
+        phone_number = ?,
+        extension = ?
       WHERE business_id = ?`,
       [
         organization_id,
@@ -1059,6 +1125,11 @@ app.put('/api/businesses/:id', async (req, res) => {
         is_active,
         update_by,
         update_process,
+        dba_name,
+        address_line_one,
+        address_line_two,
+        phone_number,
+        extension,
         id
       ]
     );
